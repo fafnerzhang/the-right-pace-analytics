@@ -14,6 +14,7 @@ const ROOT     = resolve(__dir, '..');
 const CSV_PATH = resolve(ROOT, 'threads/thread-metrics.csv');
 
 const SNAPSHOTS    = [24, 72, 168];
+const SNAP_WINDOW  = 12;   // target ~ target+12h 才算有效快照
 const FETCH_LIMIT  = 50;
 const MAX_AGE_DAYS = 10;
 
@@ -104,7 +105,12 @@ function autoSlug(post) {
 
 function neededSnaps(postTimestamp, existingHours) {
   const elapsed = hoursSince(postTimestamp);
-  return SNAPSHOTS.filter(s => elapsed >= s && !existingHours.has(s));
+  return SNAPSHOTS.filter(snap => {
+    if (existingHours.has(snap)) return false;
+    if (elapsed < snap) return false;
+    if (snap === 168) return true; // 最終快照無限窗口
+    return elapsed < snap + SNAP_WINDOW;
+  });
 }
 
 // ── main ──────────────────────────────────────────────────────────────────────
