@@ -165,7 +165,7 @@ function recentlyRecorded(rows, postId) {
       quotes:      String(m.quotes  ?? ''),
       follows:     '',
       link_clicks: '',
-      notes:       '',
+      notes:       (post.text || '').slice(0, 40).replace(/\n/g, ' ').trim(),
     });
   }
 
