@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
  * Threads snapshot fetcher — for GitHub Actions
+ * 每次執行記錄當下所有近期貼文的指標
  * Token via env: THREADS_ACCESS_TOKEN
- * CSV output:    threads/thread-metrics.csv (relative to analytics repo root)
  */
 
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -13,10 +13,9 @@ const __dir   = dirname(fileURLToPath(import.meta.url));
 const ROOT     = resolve(__dir, '..');
 const CSV_PATH = resolve(ROOT, 'threads/thread-metrics.csv');
 
-const SNAPSHOTS    = [24, 72, 168];
-const SNAP_WINDOW  = 12;   // target ~ target+12h 才算有效快照
-const FETCH_LIMIT  = 50;
-const MAX_AGE_DAYS = 10;
+const FETCH_LIMIT    = 50;
+const MAX_AGE_DAYS   = 7;
+const MIN_INTERVAL_M = 25;
 
 // ── Threads API ───────────────────────────────────────────────────────────────
 const BASE = 'https://graph.threads.net/v1.0';
@@ -55,7 +54,7 @@ async function getInsights(postId) {
     }
     return r;
   } catch (err) {
-    console.warn(`  ⚠️  ${postId} insights failed: ${err.message}`);
+    console.warn(`  ⚠️  ${postId}: ${err.message}`);
     return {};
   }
 }
@@ -103,13 +102,12 @@ function autoSlug(post) {
   return `${date}-${post.id.slice(-8)}`;
 }
 
-function neededSnaps(postTimestamp, existingHours) {
-  const elapsed = hoursSince(postTimestamp);
-  return SNAPSHOTS.filter(snap => {
-    if (existingHours.has(snap)) return false;
-    if (elapsed < snap) return false;
-    if (snap === 168) return true; // 最終快照無限窗口
-    return elapsed < snap + SNAP_WINDOW;
+function recentlyRecorded(rows, postId) {
+  const cutoff = Date.now() - MIN_INTERVAL_M * 60_000;
+  return rows.some(r => {
+    if (r.post_id !== postId || !r.measured_at) return false;
+    const t = new Date(r.measured_at).getTime();
+    return !isNaN(t) && t > cutoff;
   });
 }
 
@@ -120,76 +118,61 @@ function neededSnaps(postTimestamp, existingHours) {
     process.exit(1);
   }
 
-  console.log('🧵  Threads snapshot fetch\n');
+  console.log('🧵  Threads fetch\n');
 
   const userId = await getUserId();
   const posts  = await listPosts(userId);
   const { headers, rows } = parseCSV(readFileSync(CSV_PATH, 'utf8'));
 
-  const snapshotsByPostId = new Map();
-  const slugByPostId      = new Map();
+  const slugByPostId = new Map();
   for (const r of rows) {
     if (r.post_id && r.thread_slug) slugByPostId.set(r.post_id, r.thread_slug);
-    if (!r.post_id || !r.measured_at || !r.hours_since) continue;
-    if (!snapshotsByPostId.has(r.post_id)) snapshotsByPostId.set(r.post_id, new Set());
-    snapshotsByPostId.get(r.post_id).add(Number(r.hours_since));
   }
 
-  const newRows  = [];
-  const maxAgeH  = MAX_AGE_DAYS * 24;
+  const nowIso  = new Date().toISOString().slice(0, 16);
+  const maxAgeH = MAX_AGE_DAYS * 24;
+  const newRows = [];
 
   for (const post of posts) {
-    if (hoursSince(post.timestamp) > maxAgeH) break;
+    const elapsed = hoursSince(post.timestamp);
+    if (elapsed > maxAgeH) break;
 
-    const existingH = snapshotsByPostId.get(post.id) ?? new Set();
-    const needed    = neededSnaps(post.timestamp, existingH);
-    if (!needed.length) continue;
-
-    const slug     = slugByPostId.get(post.id) ?? autoSlug(post);
-    const postDate = post.timestamp.slice(0, 10);
-
-    const hasSeedRow = rows.some(r => r.post_id === post.id)
-                    || newRows.some(r => r.post_id === post.id && !r.measured_at);
-    if (!hasSeedRow) {
-      newRows.push({
-        post_id: post.id, thread_slug: slug, blog_slug: '', post_date: postDate,
-        category: '', measured_at: '', hours_since: '',
-        views: '', likes: '', replies: '', reposts: '', quotes: '',
-        follows: '', link_clicks: '',
-        notes: `auto; ${(post.text ?? '').slice(0, 40).replace(/\n/g, ' ')}`,
-      });
+    if (recentlyRecorded(rows, post.id)) {
+      console.log(`  ✓   ${post.id.slice(-8)} (${elapsed}h): skip`);
+      continue;
     }
 
-    for (const snap of needed) {
-      console.log(`  📡  ${slug} T+${snap}h`);
-      const m   = await getInsights(post.id);
-      const v   = m.views || 1;
-      const eng = ((((m.likes||0)+(m.replies||0)+(m.reposts||0)+(m.quotes||0))/v)*100).toFixed(2);
-      console.log(`       views=${m.views} likes=${m.likes} eng=${eng}%`);
+    const slug = slugByPostId.get(post.id) ?? autoSlug(post);
+    console.log(`  📡  ${slug} (${elapsed}h)`);
+    const m = await getInsights(post.id);
 
-      newRows.push({
-        post_id: post.id, thread_slug: slug, blog_slug: '', post_date: postDate,
-        category: '',
-        measured_at: new Date().toISOString().slice(0, 10),
-        hours_since: String(snap),
-        views: String(m.views ?? ''), likes: String(m.likes ?? ''),
-        replies: String(m.replies ?? ''), reposts: String(m.reposts ?? ''),
-        quotes: String(m.quotes ?? ''), follows: '', link_clicks: '',
-        notes: `api_auto; ${snap}h snapshot`,
-      });
+    const v   = m.views || 1;
+    const eng = ((((m.likes||0)+(m.replies||0)+(m.reposts||0)+(m.quotes||0))/v)*100).toFixed(2);
+    console.log(`       views=${m.views} likes=${m.likes} eng=${eng}%`);
 
-      if (!snapshotsByPostId.has(post.id)) snapshotsByPostId.set(post.id, new Set());
-      snapshotsByPostId.get(post.id).add(snap);
-    }
+    newRows.push({
+      post_id:     post.id,
+      thread_slug: slug,
+      blog_slug:   '',
+      post_date:   post.timestamp.slice(0, 10),
+      category:    '',
+      measured_at: nowIso,
+      hours_since: String(elapsed),
+      views:       String(m.views  ?? ''),
+      likes:       String(m.likes  ?? ''),
+      replies:     String(m.replies ?? ''),
+      reposts:     String(m.reposts ?? ''),
+      quotes:      String(m.quotes  ?? ''),
+      follows:     '',
+      link_clicks: '',
+      notes:       '',
+    });
   }
 
-  if (!newRows.length) {
-    console.log('  沒有新的快照需要寫入。');
-    process.exit(0);
-  }
+  if (!newRows.length) { console.log('  沒有新資料。'); process.exit(0); }
 
   writeCSV(headers, [...rows, ...newRows]);
-  console.log(`\n  ✅  寫入 ${newRows.length} 列 → ${CSV_PATH}`);
+  console.log(`\n  ✅  寫入 ${newRows.length} 列`);
 })().catch(err => {
   console.error('❌ ', err.message);
   process.exit(1);
