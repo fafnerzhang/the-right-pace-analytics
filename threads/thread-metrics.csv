@@ -1,0 +1,12 @@
+post_id,thread_slug,blog_slug,post_date,category,measured_at,hours_since,views,likes,replies,reposts,quotes,follows,link_clicks,notes
+18326321278275292,interval-die-now-01,,2026-07-16,心態,,,,,,,,,,source_type=hot; 跑間歇心態語錄
+18069905456709334,thread-0716-2,,2026-07-16,,,,,,,,,,,
+18046563614587908,summer-heat,,2026-07-19,訓練,,,,,,,,,,source_type=hot; 夏天訓練效益
+18458732419115647,zone2-norwegian-01,,2026-07-20,迷思,,,,,,,,,,source_type=hot; Zone2+Norwegian4x4
+18098781224214335,high-knee-form-01,,2026-07-21,技術,,,,,,,,,,source_type=hot; 高抬腿技術訓練
+,strength-durability-01,,,迷思,,24,,,,,,,,source_type=paper; draft 尚未發文; Zanini 2025 RCT cred 4.5/5
+,hunter-enjoy-process-01,,2026-07-03,哲學,2026-07-05,48,28997,3600,27,461,,13,,"source_type=hot; 獵人語錄+跑步收束; 大爆紅破紀錄(前紀錄Zone2 1400讚的2.5倍); shares(send)=278; views為13hr值,2天更高未截; follows+13為30天區間非單篇歸因; 30天瀏覽212K→294K"
+,zone2-much-ado-01,coggan-zone2,,迷思,,24,,,,,,,,source_type=paper; draft 未發文; Storoschuk 2025 Sports Med cred 3.5/5; 串文2則(348/228); Zone2神化反思
+18046563614587908,summer-heat,,2026-07-19,訓練,2026-07-22,72,239,8,8,1,0,,,api_fetch; 72h snapshot
+18458732419115647,zone2-norwegian-01,,2026-07-20,迷思,2026-07-22,24,2652,77,5,1,0,,,api_fetch; 24h snapshot
+18098781224214335,high-knee-form-01,,2026-07-21,技術,2026-07-22,24,421,12,2,0,0,,,api_fetch; 24h snapshot
