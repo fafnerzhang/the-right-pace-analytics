@@ -1,9 +1,7 @@
 name: Fetch Threads Snapshots
 
 on:
-  schedule:
-    - cron: '*/30 * * * *'   # every 30 minutes
-  workflow_dispatch:           # manual trigger from GitHub UI
+  workflow_dispatch:           # triggered by Cloudflare Worker every 30 min
 
 jobs:
   fetch:
