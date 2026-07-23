@@ -92,6 +92,71 @@ IG Insights 無公開 API，需人工填寫。
 
 ---
 
+## 海巡回覆（Outreach）
+
+主動去別人的跑步／健身貼文底下留言互動的紀錄。目的：追蹤「回覆哪類貼文 →
+帶來曝光／追蹤」的因果，並完整留存回覆邏輯、回覆時間、對方發文時間。
+
+- 爬蟲：[`../tools/threads-scout/scout.mjs`](../tools/threads-scout/scout.mjs)（Playwright 滑 feed，不經 API）
+- 灌檔：[`scripts/ingest-scout.mjs`](./scripts/ingest-scout.mjs)（`latest.json` → 主庫，依 `post_id` 去重併入）
+- **單一主庫**：`threads/outreach/reply-log.csv`（唯一資料來源；不再堆 timestamped 檔）
+- 暫存：`../tools/threads-scout/out/latest.json`（每次爬蟲覆蓋，ingest 讀它）
+
+### 機制
+
+- **無排程輪替**：每次 `make scout` 手動跑一次、單一 feed、滑到底。scout 覆蓋寫 `latest.json`，
+  ingest 依 `post_id` 併進主庫；既有候選會**刷新互動數/分數**，但保留你手填的回覆欄位與 status。
+- **時效淘汰**（ingest 每次自動執行，只淘汰 `candidate`；`replied`/`skipped` 永久保留當紀錄）：
+  - `purpose=reply`（值得回覆）→ 只留發文 **36 小時**內
+  - `purpose=reference`（英文素材）→ 留 **7 天**
+
+### 流程
+
+```
+# 一鍵：爬 running feed → 併進主庫（reply，留 36h）
+make scout                                   # 可加 FEED= SCROLLS= MIN=
+
+# 追蹤大帳號撈英文素材 → 併進主庫（reference，留 7d）
+make scout-accounts ACCOUNTS="handle1,handle2"
+
+# 開面板瀏覽 / 回覆（回覆後就地標 replied、補 reply_angle / reply_text，寫回 CSV）
+make scout-dashboard                          # port 3458
+```
+
+手動拆步：`node tools/threads-scout/scout.mjs --feed running --headless` → `node analytics/scripts/ingest-scout.mjs --purpose reply`。
+
+`--feed` 可選：`running`（Running Threads tag）、`tri`（Triathlon）、`following`、`foryou`。
+
+### 欄位說明
+
+| 欄位 | 說明 | 來源 |
+|------|------|------|
+| `scouted_at` | 最近一次爬到這篇的時間 | 自動 |
+| `feed` | 來源 feed / 帳號 | 自動 |
+| `purpose` | `reply`（值得回覆，留 36h）/ `reference`（英文素材，留 7d） | 自動 |
+| `account` | 對方帳號 | 自動 |
+| `post_url` | 貼文永久連結 | 自動 |
+| `post_id` | 貼文 shortcode（去重鍵） | 自動 |
+| `post_time` | **對方發文時間**（ISO UTC） | 自動 |
+| `post_age_h` | 最近爬到時貼文已發幾小時 | 自動 |
+| `relevance` | 跑步/健身關鍵字加權分數 | 自動 |
+| `likes` `replies` `reposts` `shares` | 貼文互動數 | 自動 |
+| `topic_hits` | 命中的關鍵字（`;` 分隔） | 自動 |
+| `status` | `candidate` → `replied` / `skipped` | **手動維護** |
+| `replied_at` | **我實際回覆的時間** | **手動補填** |
+| `reply_angle` | **回覆邏輯／切入點**（為什麼回、想帶到什麼） | **手動補填** |
+| `reply_text` | 實際回覆內容 | **手動補填** |
+| `text` | 完整內文 | 自動 |
+| `notes` | 貼文前 40 字（自動）＋ 備註 | 混合 |
+
+### 判讀
+
+- 比 `feed` × `status=replied` 後續有沒有帶追蹤／回訪 → 哪個 feed 的人最容易轉化
+- 比 `post_age_h`：回覆「越新的貼文」是否曝光越好（趁貼文還在被推時卡位）
+- `reply_angle` 分類後，看哪種切入點（共鳴／糾錯迷思／給課表建議）最有效 → 回饋內容策略、導流到 1:1 教練漏斗
+
+---
+
 ## 衍生指標（判讀用）
 
 用 T+72h 或 T+7d 的列計算，跨貼文比較：
