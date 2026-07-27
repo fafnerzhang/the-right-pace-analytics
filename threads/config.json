@@ -1,0 +1,18 @@
+{
+  "_comment": "Threads 追蹤調整檔。改完存檔即生效（下次 fetch / ingest 讀取）。fetch_limit=每次抓幾則、max_age_days=只追蹤近幾天、min_interval_minutes=同一則幾分鐘內不重複記錄。",
+  "posts": {
+    "fetch_limit": 50,
+    "max_age_days": 7,
+    "min_interval_minutes": 25
+  },
+  "replies": {
+    "fetch_limit": 50,
+    "max_age_days": 3,
+    "min_interval_minutes": 25
+  },
+  "outreach_retention_hours": {
+    "_comment": "海巡候選清單保留時效（小時）：過期且未處理的 candidate 會被 ingest 淘汰；已回覆/略過的永久保留。",
+    "reply": 36,
+    "reference": 168
+  }
+}

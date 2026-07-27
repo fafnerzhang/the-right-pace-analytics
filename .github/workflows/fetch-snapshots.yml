@@ -16,17 +16,23 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Fetch snapshots
+      - name: Fetch post snapshots
         env:
           THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
           THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
         run: node scripts/fetch-threads.mjs
 
+      - name: Fetch reply snapshots
+        env:
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+        run: node scripts/fetch-thread-replies.mjs
+
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add threads/thread-metrics.csv
+          git add threads/thread-metrics.csv threads/posts.csv threads/reply-metrics.csv threads/replies.csv
           git diff --staged --quiet && echo "No changes" || \
             git commit -m "data: threads snapshot $(date -u +%Y-%m-%d)" && \
             git push

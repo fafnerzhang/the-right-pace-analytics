@@ -24,8 +24,16 @@ const OUT_DIR  = resolve(ROOT, 'threads/outreach');
 const CSV_PATH = resolve(OUT_DIR, 'reply-log.csv');
 const DEFAULT_JSON = resolve(REPO, 'tools/threads-scout/out/latest.json');
 
-// 時效視窗（小時）
-const RETENTION_H = { reply: 36, reference: 7 * 24 };
+// 時效視窗（小時）— 讀 threads/config.json → outreach_retention_hours（找不到就用預設）
+const CONFIG_PATH = resolve(ROOT, 'threads/config.json');
+function loadRetention() {
+  const def = { reply: 36, reference: 7 * 24 };
+  try {
+    const c = JSON.parse(readFileSync(CONFIG_PATH, 'utf8')).outreach_retention_hours || {};
+    return { reply: c.reply ?? def.reply, reference: c.reference ?? def.reference };
+  } catch { return def; }
+}
+const RETENTION_H = loadRetention();
 
 // ── args ──────────────────────────────────────────────────────────────────────
 const argv = process.argv.slice(2);
@@ -44,7 +52,7 @@ if (!existsSync(jsonPath)) { console.error(`❌ 找不到爬蟲結果：${jsonPa
 const COLS = [
   'scouted_at', 'feed', 'purpose', 'account', 'post_url', 'post_id', 'post_time',
   'post_age_h', 'relevance', 'likes', 'replies', 'reposts', 'shares',
-  'topic_hits', 'status', 'replied_at', 'reply_angle', 'reply_text', 'text', 'notes',
+  'topic_hits', 'status', 'replied_at', 'reply_url', 'reply_angle', 'reply_text', 'text', 'notes',
 ];
 function parseCSV(raw) {
   const rows = []; let f = '', row = [], inQ = false;
@@ -113,7 +121,7 @@ for (const r of posts) {
   } else {
     db.set(id, {
       ...metrics, purpose: PURPOSE, status: 'candidate',
-      replied_at: '', reply_angle: '', reply_text: '',
+      replied_at: '', reply_url: '', reply_angle: '', reply_text: '',
     });
     added++;
   }
